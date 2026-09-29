@@ -67,6 +67,20 @@ strings (see `GeneratorSupport.cs`); a class can combine any subset of them.
    risk of that race, but defers anyway so there is exactly one rule to reason
    about, not two subtly different ones depending on which generator you're
    reading.
+   **Deferral means nothing fires until the app registers a dispatcher.**
+   `UpdateScheduler` queues every notification until `UpdateScheduler.Initialize`
+   is called, so a ViewModel whose command handler runs but whose bound labels
+   never change almost always means `Initialize` was never called. WPF's
+   `ForView.Initialize` does it for you; MAUI has no equivalent, so the app must
+   call it once, early in `MauiProgram.CreateMauiApp()`:
+   ```csharp
+   Assisticant.UpdateScheduler.Initialize(action =>
+       Application.Current!.Dispatcher.DispatchDelayed(TimeSpan.Zero, action));
+   ```
+   The delegate must always queue, never run inline: use `DispatchDelayed(Zero)`,
+   not `MainThread.BeginInvokeOnMainThread` (which runs inline on the main
+   thread and reintroduces the stale-read race). When writing or reviewing a
+   MAUI app, check for this call first.
 5. **Collection-mode `[Computed]` targets a real `ObservableCollection<T>`,
    never a custom `INotifyCollectionChanged` implementation and never
    `ComputedList<T>` directly.** Confirmed independent of anything in this
